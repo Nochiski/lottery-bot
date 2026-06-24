@@ -61,7 +61,18 @@ def check_winning_win720(authCtrl: auth.AuthController) -> dict:
     return item
 
 def send_message(mode: int, lottery_type: int, response: dict, webhook_url: str):
-    notify = notification.Notification()
+    telegram_bot_token = os.environ.get('TELEGRAM_BOT_TOKEN')
+    if telegram_bot_token and telegram_bot_token.startswith("YOUR_"):
+        telegram_bot_token = None
+
+    telegram_chat_id = os.environ.get('TELEGRAM_CHAT_ID')
+    if telegram_chat_id and telegram_chat_id.startswith("YOUR_"):
+        telegram_chat_id = None
+
+    notify = notification.Notification(
+        telegram_bot_token=telegram_bot_token,
+        telegram_chat_id=telegram_chat_id,
+    )
 
     if mode == 0:
         if lottery_type == 0:
