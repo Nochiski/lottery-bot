@@ -1,5 +1,6 @@
 import requests
 import re
+import html
 
 class Notification:
     def __init__(self, telegram_bot_token: str = None, telegram_chat_id: str = None) -> None:
@@ -160,5 +161,39 @@ class Notification:
             return
 
         url = f"https://api.telegram.org/bot{self.telegram_bot_token}/sendMessage"
-        payload = { "chat_id": self.telegram_chat_id, "text": message }
-        requests.post(url, json=payload, timeout=10)
+        html_message = self._to_telegram_html(message)
+        res = requests.post(
+            url,
+            json={
+                "chat_id": self.telegram_chat_id,
+                "text": html_message,
+                "parse_mode": "HTML",
+            },
+            timeout=10,
+        )
+        if res.status_code != 200:
+            # HTML 파싱 실패 시 원문 평문으로라도 전달 (알림 유실 방지)
+            requests.post(
+                url,
+                json={ "chat_id": self.telegram_chat_id, "text": message },
+                timeout=10,
+            )
+
+    def _to_telegram_html(self, message: str) -> str:
+        # Discord 전용 표기를 텔레그램 HTML 로 변환
+        message = message.replace(":moneybag:", "💰")
+
+        parts = message.split("```")
+        rendered = []
+        for index, part in enumerate(parts):
+            if index % 2 == 1:  # ``` ``` 코드블록 내부 → 등폭(monospace) 정렬 유지
+                if "\n" in part:
+                    first_line, rest = part.split("\n", 1)
+                    if first_line.strip() and " " not in first_line.strip():
+                        part = rest  # 'ini' 같은 언어 태그 줄 제거
+                rendered.append(f"<pre>{html.escape(part, quote=False)}</pre>")
+            else:
+                escaped = html.escape(part, quote=False)
+                escaped = re.sub(r"\*([^*\n]+)\*", r"<b>\1</b>", escaped)  # *강조* → 굵게
+                rendered.append(escaped)
+        return "".join(rendered)
